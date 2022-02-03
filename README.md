@@ -2,7 +2,8 @@
 
 required libraries:
 MariaDB, json-c
- 
+
+
 MariaDB install:
 ```
 $ sudo apt install mariadb-server
@@ -12,9 +13,10 @@ MariaDB [(none)]> GRANT ALL ON *.* TO 'admin'@'localhost' IDENTIFIED BY 'passwor
 MariaDB [(none)]> FLUSH PRIVILEGES;
 MariaDB [(none)]> exit
 ```
-Fill 'admin', 'localhost' and 'password' in the following variables:
-```char *server, char *user, char *passwd```
+Fill 'admin', 'localhost' and 'password' in the following variables: ```char *server, char *user, char *passwd```
+
 Set ```char *database``` to prefered database name ex: "mydb"
+
 
 json-c install:
 ```
