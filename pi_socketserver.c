@@ -44,9 +44,7 @@ int main(int argc, char const *argv[]) {
 
 int sql_err() {
 	fprintf(stderr, "%s\n", mysql_error(con));
-	if (con != NULL) {
-		mysql_close(con);
-	}
+	if (con != NULL) mysql_close(con);
 	return(1);
 }
 
