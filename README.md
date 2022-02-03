@@ -1,6 +1,7 @@
 # PI-Socketserver
 
 Required libraries:
+
 MariaDB, json-c
 
 
