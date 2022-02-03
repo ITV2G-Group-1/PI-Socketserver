@@ -1,6 +1,6 @@
 # PI-Socketserver
 
-required libraries:
+Required libraries:
 MariaDB, json-c
 
 
@@ -23,4 +23,4 @@ json-c install:
 $ sudo apt install libjson-c-dev
 ```
 
-compile using gcc pi_sockerserver.c -std=c99 -lmysqlclient -ljson-c -o <desired output file>
+Compile using ```gcc pi_sockerserver.c -std=c99 -lmysqlclient -ljson-c -o <desired output file>```
