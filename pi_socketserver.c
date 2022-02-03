@@ -21,6 +21,7 @@ int create_socket();
 int json_reader(char *json_string);
 int sql_err();
 int connect_to_database();
+int get_uuid_id(char uuid[20]);
 int insert_temp_data(char uuid[20], double *temp, char time[32]);
 int insert_light_data(char uuid[20], double *light_intensity, char time[32]);
 int insert_gps_data(char uuid[20], double *gps_long, double *gps_lat, char time[32]);
@@ -32,8 +33,11 @@ static const char *user = "main";
 static const char *passwd = "";
 static const char *database = "testdb";
 
+static char query[100];
+
 static MYSQL *con;
-static MYSQL_RES *sql_res;
+static MYSQL_RES *res;
+static MYSQL_ROW row;
 
 // {"uuid":"489377d75d1d15247320","data":[{"type":"temperature","value":22.61000061,"timestamp":1643818772},{"type":"light","value":15,"timestamp":1643818773},{"type":"temperature","value":22.61000061,"timestamp":1643818775},{"type":"light","value":15,"timestamp":1643818776},{"type":"temperature","value":22.60000038,"timestamp":1643818778},{"type":"light","value":15,"timestamp":1643818779},{"type":"temperature","value":22.59000015,"timestamp":1643818781}]}}]}
 
@@ -41,10 +45,12 @@ char *json_string = "{\"uuid\":\"489377d75d1d15247320\",\"data\":[{\"type\":\"te
 
 int main(int argc, char const *argv[]) {
     connect_to_database();
+    json_reader(json_string);
+    return 0;
 }
 
-int create_socket(); {
-
+int create_socket() {
+	return 0;
 }
 
 int json_reader(char *json_string) {
@@ -61,7 +67,9 @@ int json_reader(char *json_string) {
 	size_t n_data;
 	size_t i;
 
+    char c_uuid[20];
     char c_type[12];
+    int id;
     int i_light;
     double d_temp;
     double d_long;
@@ -78,7 +86,11 @@ int json_reader(char *json_string) {
         fprintf(stderr, "Error occured while trying to get \"uuid\" from: \n%s\n", json_string);
         return 1;
     }
-    fprintf(stdout, "uuid: %s\n", json_object_get_string(uuid));
+    strcpy(c_uuid, json_stringify(uuid));
+    fprintf(stdout, "uuid: %s\n", c_uuid);
+
+    id = get_uuid_id(c_uuid);
+    fprintf(stdout, "id: %d\n", id); 
 
 	json_get_ex(parsed_json, "data", &data);
     if (!data) {
@@ -167,39 +179,52 @@ int sql_err() {
 }
 
 int connect_to_database() {
-    char db[] = "USE ";
-
     con = mysql_init(NULL);
     if (!con) sql_err();
 
     if (!mysql_real_connect(con, server, user, passwd,
                 NULL, 0, NULL, 0)) sql_err();
 
-    strncat(db, database, sizeof(db) + sizeof(database));
-    if (mysql_query(con, db)) {
+    sprintf(query, "USE %s", database);
+    if (mysql_query(con, query)) {
         fprintf(stderr, "%s\ncreating database '%s'\n", mysql_error(con), database);
         if (!create_database() == 0) return 1;
     }
+	return 0;
+}
 
+int get_uuid_id(char uuid[20]) {
+	int id;
+
+	sprintf(query, "SELECT id FROM ESPs WHERE uuid='%s'", uuid);
+	mysql_query(con, query);
+
+	res = mysql_store_result(con);
+	
+	if (!res) sql_err();
+    
+    while((row = mysql_fetch_row(res)) !=0) {
+		id = row[0] ? atof(row[0]) : 0.0f;
+
+		mysql_free_result(res);
+		return id;
+    }
+    return 0;
 }
 
 int insert_temp_data(char uuid[20], double *temp, char time[32]) {
-    int id;
-    if (mysql_query(con, "SELECT * FROM ESPs WHERE uuid='uuid'")) sql_err();
-    sql_res = mysql_use_result(con);
-    if (!sql_res) return sql_err();
-    id = sql_res;
-	fprintf(stdout, "%d\n", id);
-	mysql_free_result(sql_res);
     if (mysql_query(con, "")) return sql_err();
+    return 0;
 }
 
 int insert_light_data(char uuid[20], double *light_intensity, char time[32]) {
     if (mysql_query(con, "")) return sql_err();
+    return 0;
 }
 
 int insert_gps_data(char uuid[20], double *gps_long, double *gps_lat, char time[32]) {
     if (mysql_query(con, "")) return sql_err();
+    return 0;
 }
 
 int create_database() {
