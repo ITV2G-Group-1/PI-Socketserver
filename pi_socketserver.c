@@ -39,55 +39,55 @@ static MYSQL *con;
 static MYSQL_RES *res;
 static MYSQL_ROW row;
 
+int server_fd, new_socket;
+struct sockaddr_in address;
+int opt = 1;
+int addrlen = sizeof(address);
+
 int main(int argc, char const *argv[]) {
     connect_to_database();
-    int server_fd, new_socket;
-    struct sockaddr_in address;
-    int opt = 1;
-    int addrlen = sizeof(address);
-    
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-        perror("socket failed");
-        exit(EXIT_FAILURE);
-    }
-       
-    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT,
-                                                  &opt, sizeof(opt))) {
-        perror("setsockopt");
-        exit(EXIT_FAILURE);
-    }
-    
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons( PORT );
+    create_socket();
        
     if (bind(server_fd, (struct sockaddr *)&address, 
                                  sizeof(address))<0) {
-        perror("bind failed");
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "bind failed");
+        return 1;
     }
 
     if (listen(server_fd, 3) < 0) {
-        perror("listen");
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "listen");
+        return 1;
     }
     
     while (1) {
         char buffer[1024] = {0};
         if ((new_socket = accept(server_fd, (struct sockaddr *)&address, 
                         (socklen_t*)&addrlen))<0) {
-            perror("accept");
-            exit(EXIT_FAILURE);
+            fprintf(stderr, "accept");
+            return 1;
         }
     
         read(new_socket, buffer, 1024);
         json_reader(buffer);
-        printf("%s\n%d\n", buffer, server_fd);
     }
     return 0;
 }
 
 int create_socket() {
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+        fprintf(stderr, "socket failed");
+        return 1;
+    }
+       
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT,
+                                                  &opt, sizeof(opt))) {
+        fprintf(stderr, "setsockopt");
+        return 1;
+    }
+    
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons( PORT );
 	return 0;
 }
 
@@ -124,11 +124,9 @@ int json_reader(char *json_string) {
         fprintf(stderr, "Error occured while trying to get \"uuid\" from: \n%s\n", json_string);
         return 1;
     }
-    strcpy(c_uuid, json_stringify(uuid));
-    fprintf(stdout, "uuid: %s\n", c_uuid);
 
+    strcpy(c_uuid, json_stringify(uuid));
     id = get_uuid_id(c_uuid);
-    fprintf(stdout, "id: %d\n", id); 
 
 	json_get_ex(parsed_json, "data", &data);
     if (!data) {
@@ -137,7 +135,7 @@ int json_reader(char *json_string) {
     }
 
     n_data = json_length(data);
-    fprintf(stdout, "Found %d datapoints\n", n_data);
+    fprintf(stdout, "uuid: %s send %d datapoints\n", c_uuid, n_data);
     for (i = 0; i < n_data; i++) {
         datapoint = json_get_id(data, i);
 
@@ -245,21 +243,18 @@ int get_uuid_id(char uuid[20]) {
 
 int insert_temp_data(int id, double temp, char time[32]) {
     sprintf(query, "INSERT INTO TempData (Temp_ESP_id, Temp_DateTimeFromESP, Temp_Temp) VALUES (%d, '%s', %.8f)", id, time, temp);
-    fprintf(stdout, "%s\n", query);
     if (mysql_query(con, query)) return sql_err();
     return 0;
 }
 
 int insert_light_data(int id, int light_intensity, char time[32]) {
     sprintf(query, "INSERT INTO LightIntensityData (Light_ESP_id, Light_DateTimeFromESP, Light_Intensity) VALUES ('%d', '%s', '%d')", id, time, light_intensity);
-    fprintf(stdout, "%s\n", query);
     if (mysql_query(con, query)) return sql_err();
     return 0;
 }
 
 int insert_gps_data(int id, double gps_long, double gps_lat, char time[32]) {
-    sprintf(query, "INSERT INTO GPSData (GPS_ESP_id, GPS_DateTimeFromESP, GPS_long, GPS_lat) VALUES ('%d', '%s', '%.9f', '%.8f')", id, time, gps_long, gps_lat);
-    fprintf(stdout, "%s\n", query);
+    sprintf(query, "INSERT INTO GPSData (GPS_ESP_id, GPS_DateTimeFromESP, GPS_long, GPS_lat) VALUES ('%d', '%s', '%.6f', '%.6f')", id, time, gps_long, gps_lat);
     if (mysql_query(con, query)) return sql_err();
     return 0;
 }
@@ -294,7 +289,7 @@ int create_database() {
 			Light_ESP_id INT NOT NULL,\
 			Light_DateTimeFromESP DATETIME(2) NOT NULL,\
 			Light_TimestampAdded TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\
-			Light_Intensity DECIMAL(11,4) NOT NULL,\
+			Light_Intensity SMALL INT NOT NULL,\
 			PRIMARY KEY (ESP_id, DateTimeFromESP),\
 			CONSTRAINT fk_LightIntensityData_ESPs\
 				FOREIGN KEY (ESP_id)\
