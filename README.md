@@ -13,8 +13,8 @@ MariaDB [(none)]> FLUSH PRIVILEGES;
 MariaDB [(none)]> exit
 ```
 Fill 'admin', 'localhost' and 'password' in the following variables:
-char *server, char *user, char *passwd
-Set char *database to prefered database name ex: "mydb"
+```char *server, char *user, char *passwd```
+Set char \*database to prefered database name ex: "mydb"
 
 json-c install:
 ```
