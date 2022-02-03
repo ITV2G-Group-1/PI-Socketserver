@@ -22,9 +22,9 @@ int json_reader(char *json_string);
 int sql_err();
 int connect_to_database();
 int get_uuid_id(char uuid[20]);
-int insert_temp_data(char uuid[20], double *temp, char time[32]);
-int insert_light_data(char uuid[20], double *light_intensity, char time[32]);
-int insert_gps_data(char uuid[20], double *gps_long, double *gps_lat, char time[32]);
+int insert_temp_data(int id, double temp, char time[32]);
+int insert_light_data(int id, int light_intensity, char time[32]);
+int insert_gps_data(int id, double gps_long, double gps_lat, char time[32]);
 int create_database();
 
 static const char time_format[] = "%Y-%m-%d %X";
@@ -33,7 +33,7 @@ static const char *user = "main";
 static const char *passwd = "";
 static const char *database = "testdb";
 
-static char query[100];
+static char query[256];
 
 static MYSQL *con;
 static MYSQL_RES *res;
@@ -41,7 +41,7 @@ static MYSQL_ROW row;
 
 // {"uuid":"489377d75d1d15247320","data":[{"type":"temperature","value":22.61000061,"timestamp":1643818772},{"type":"light","value":15,"timestamp":1643818773},{"type":"temperature","value":22.61000061,"timestamp":1643818775},{"type":"light","value":15,"timestamp":1643818776},{"type":"temperature","value":22.60000038,"timestamp":1643818778},{"type":"light","value":15,"timestamp":1643818779},{"type":"temperature","value":22.59000015,"timestamp":1643818781}]}}]}
 
-char *json_string = "{\"uuid\":\"489377d75d1d15247320\",\"data\":[{\"type\":\"temperature\",\"value\":22.61000061,\"timestamp\":1643818772},{\"type\":\"light\",\"value\":15,\"timestamp\":1643818773},{\"type\":\"temperature\",\"value\":22.61000061,\"timestamp\":1643818775},{\"type\":\"light\",\"value\":15,\"timestamp\":1643818776},{\"type\":\"temperature\",\"value\":22.60000038,\"timestamp\":1643818778},{\"type\":\"light\",\"value\":15,\"timestamp\":1643818779},{\"type\":\"temperature\",\"value\":22.59000015,\"timestamp\":1643818781}]}";
+char *json_string = "{\"uuid\":\"489377d75d1d15247320\",\"data\":[{\"type\":\"temperature\",\"value\":22.61000061,\"timestamp\":1643818775},{\"type\":\"light\",\"value\":15,\"timestamp\":1643818776},{\"type\":\"temperature\",\"value\":22.60000038,\"timestamp\":1643818778},{\"type\":\"light\",\"value\":15,\"timestamp\":1643818779},{\"type\":\"temperature\",\"value\":22.59000015,\"timestamp\":1643818781}]}";
 
 int main(int argc, char const *argv[]) {
     connect_to_database();
@@ -50,6 +50,8 @@ int main(int argc, char const *argv[]) {
 }
 
 int create_socket() {
+
+    
 	return 0;
 }
 
@@ -128,10 +130,8 @@ int json_reader(char *json_string) {
                 break;
             }
 
-            //insert_temp_data(uuid, d_temp, time);
-			fprintf(stdout, "type: %s \t", c_type);
-			fprintf(stdout, "time: %s \t", time);
-			fprintf(stdout, "value: %.8f\n", d_temp);
+            insert_temp_data(id, d_temp, time);
+
         } else if (strcmp(c_type, "light") == 0) {
             json_get_ex(datapoint, "value", &value);
             i_light = json_intify(value);
@@ -140,10 +140,8 @@ int json_reader(char *json_string) {
                 break;
             }
             
-            //insert_light_data(uuid, i_light, time);
-            fprintf(stdout, "type: %s \t\t", c_type);
-			fprintf(stdout, "time: %s\t", time);
-			fprintf(stdout, "value: %d\n", i_light);
+            insert_light_data(id, i_light, time);
+
         } else if (strcmp(c_type, "gps") == 0) {
             json_get_ex(datapoint, "long", &gps_long);
             d_long = json_doublify(gps_long);
@@ -159,11 +157,8 @@ int json_reader(char *json_string) {
                 break;
             }
 
-            //insert_gps_data(uuid, gps_long, gps_lat, time);
-            fprintf(stdout, "type: %s \t\t", c_type);
-			fprintf(stdout, "time: %s \t", time);
-			fprintf(stdout, "long: %.9f \t", d_long);
-			fprintf(stdout, "lat: %.8f\n", d_lat);
+            insert_gps_data(id, d_long, d_lat, time);
+
         } else {
             fprintf(stderr, "Error occured while trying to find the \"type\" at datapoint %d from: \n%s\n", i, json_string);
             break;
@@ -212,18 +207,24 @@ int get_uuid_id(char uuid[20]) {
     return 0;
 }
 
-int insert_temp_data(char uuid[20], double *temp, char time[32]) {
-    if (mysql_query(con, "")) return sql_err();
+int insert_temp_data(int id, double temp, char time[32]) {
+    sprintf(query, "INSERT INTO TempData (Temp_ESP_id, Temp_DateTimeFromESP, Temp_Temp) VALUES (%d, '%s', %.8f)", id, time, temp);
+    fprintf(stdout, "%s\n", query);
+    if (mysql_query(con, query)) return sql_err();
     return 0;
 }
 
-int insert_light_data(char uuid[20], double *light_intensity, char time[32]) {
-    if (mysql_query(con, "")) return sql_err();
+int insert_light_data(int id, int light_intensity, char time[32]) {
+    sprintf(query, "INSERT INTO LightIntensityData (Light_ESP_id, Light_DateTimeFromESP, Light_Intensity) VALUES ('%d', '%s', '%d')", id, time, light_intensity);
+    fprintf(stdout, "%s\n", query);
+    if (mysql_query(con, query)) return sql_err();
     return 0;
 }
 
-int insert_gps_data(char uuid[20], double *gps_long, double *gps_lat, char time[32]) {
-    if (mysql_query(con, "")) return sql_err();
+int insert_gps_data(int id, double gps_long, double gps_lat, char time[32]) {
+    sprintf(query, "INSERT INTO GPSData (GPS_ESP_id, GPS_DateTimeFromESP, GPS_long, GPS_lat) VALUES ('%d', '%s', '%.9f', '%.8f')", id, time, gps_long, gps_lat);
+    fprintf(stdout, "%s\n", query);
+    if (mysql_query(con, query)) return sql_err();
     return 0;
 }
 
@@ -242,21 +243,7 @@ int create_database() {
 			UNIQUE INDEX id_UNIQUE (id ASC))\
 			ENGINE = InnoDB;")) return sql_err();		
 	
-	if (mysql_query(con, "CREATE TABLE IF NOT EXISTS GPSData(\
-			GPS_ESP_id INT NOT NULL,\
-			GPS_DateTimeFromESP DATETIME(2) NOT NULL,\
-			GPS_TimestampAdded TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\
-			GPS_long DECIMAL(9,6) NOT NULL,\
-			GPS_lat DECIMAL(8,6) NOT NULL,\
-			PRIMARY KEY (ESP_id, DateTimeFromESP),\
-			CONSTRAINT fk_GPSData_ESPs\
-				FOREIGN KEY (ESP_id)\
-				REFERENCES testdb.ESPs (id)\
-				ON DELETE NO ACTION\
-				ON UPDATE NO ACTION)\
-			ENGINE = InnoDB;")) return sql_err();
-	
-	if (mysql_query(con, "CREATE TABLE IF NOT EXISTS TempData(\
+    if (mysql_query(con, "CREATE TABLE IF NOT EXISTS TempData(\
 			Temp_ESP_id INT NOT NULL,\
 			Temp_DateTimeFromESP DATETIME(2) NOT NULL,\
 			Temp_TimestampAdded TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\
@@ -276,6 +263,20 @@ int create_database() {
 			Light_Intensity DECIMAL(11,4) NOT NULL,\
 			PRIMARY KEY (ESP_id, DateTimeFromESP),\
 			CONSTRAINT fk_LightIntensityData_ESPs\
+				FOREIGN KEY (ESP_id)\
+				REFERENCES testdb.ESPs (id)\
+				ON DELETE NO ACTION\
+				ON UPDATE NO ACTION)\
+			ENGINE = InnoDB;")) return sql_err();
+
+	if (mysql_query(con, "CREATE TABLE IF NOT EXISTS GPSData(\
+			GPS_ESP_id INT NOT NULL,\
+			GPS_DateTimeFromESP DATETIME(2) NOT NULL,\
+			GPS_TimestampAdded TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\
+			GPS_long DECIMAL(9,6) NOT NULL,\
+			GPS_lat DECIMAL(8,6) NOT NULL,\
+			PRIMARY KEY (ESP_id, DateTimeFromESP),\
+			CONSTRAINT fk_GPSData_ESPs\
 				FOREIGN KEY (ESP_id)\
 				REFERENCES testdb.ESPs (id)\
 				ON DELETE NO ACTION\
