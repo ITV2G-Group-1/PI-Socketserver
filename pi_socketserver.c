@@ -8,14 +8,14 @@
 #include <json-c/json.h>
 #include <mysql/mysql.h>
 
-#define PORT 17021
-
 #define json_get_ex(datapoint, var, result) (json_object_object_get_ex(datapoint, var, result))
 #define json_get_id(array, i) (json_object_array_get_idx(array, i))
 #define json_length(array) (json_object_array_length(array))
 #define json_stringify(var) (json_object_get_string(var))
 #define json_intify(var) (json_object_get_int(var))
 #define json_doublify(var) (json_object_get_double(var))
+
+#define PORT 17021
 
 int create_socket();
 int json_reader(char *json_string);
@@ -289,7 +289,7 @@ int create_database() {
 			Light_ESP_id INT NOT NULL,\
 			Light_DateTimeFromESP DATETIME(2) NOT NULL,\
 			Light_TimestampAdded TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\
-			Light_Intensity SMALL INT NOT NULL,\
+			Light_Intensity SMALLINT(0) NOT NULL,\
 			PRIMARY KEY (ESP_id, DateTimeFromESP),\
 			CONSTRAINT fk_LightIntensityData_ESPs\
 				FOREIGN KEY (ESP_id)\
