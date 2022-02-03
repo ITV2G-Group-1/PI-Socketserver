@@ -8,14 +8,14 @@
 #include <json-c/json.h>
 #include <mysql/mysql.h>
 
-#define PORT 17021
-
 #define json_get_ex(datapoint, var, result) (json_object_object_get_ex(datapoint, var, result))
 #define json_get_id(array, i) (json_object_array_get_idx(array, i))
 #define json_length(array) (json_object_array_length(array))
 #define json_stringify(var) (json_object_get_string(var))
 #define json_intify(var) (json_object_get_int(var))
 #define json_doublify(var) (json_object_get_double(var))
+
+#define PORT 17021
 
 int create_socket();
 int json_reader(char *json_string);
@@ -267,9 +267,8 @@ int insert_gps_data(int id, double gps_long, double gps_lat, char time[32]) {
 int create_database() {
     if (!con) return sql_err();
 
-	if (mysql_query(con, "CREATE DATABASE IF NOT EXISTS testdb")) {
-		return sql_err();
-	}
+    sprintf(query, "CREATE DATABASE IF NOT EXISTS %s", database)
+	if (mysql_query(con, query)) return sql_err();
 
 	if (mysql_query(con, "CREATE TABLE IF NOT EXISTS ESPs(\
 			id INT NOT NULL AUTO_INCREMENT,\
