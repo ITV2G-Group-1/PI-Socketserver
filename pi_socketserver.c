@@ -39,19 +39,55 @@ static MYSQL *con;
 static MYSQL_RES *res;
 static MYSQL_ROW row;
 
-// {"uuid":"489377d75d1d15247320","data":[{"type":"temperature","value":22.61000061,"timestamp":1643818772},{"type":"light","value":15,"timestamp":1643818773},{"type":"temperature","value":22.61000061,"timestamp":1643818775},{"type":"light","value":15,"timestamp":1643818776},{"type":"temperature","value":22.60000038,"timestamp":1643818778},{"type":"light","value":15,"timestamp":1643818779},{"type":"temperature","value":22.59000015,"timestamp":1643818781}]}}]}
-
-char *json_string = "{\"uuid\":\"489377d75d1d15247320\",\"data\":[{\"type\":\"temperature\",\"value\":22.61000061,\"timestamp\":1643818775},{\"type\":\"light\",\"value\":15,\"timestamp\":1643818776},{\"type\":\"temperature\",\"value\":22.60000038,\"timestamp\":1643818778},{\"type\":\"light\",\"value\":15,\"timestamp\":1643818779},{\"type\":\"temperature\",\"value\":22.59000015,\"timestamp\":1643818781}]}";
-
 int main(int argc, char const *argv[]) {
     connect_to_database();
-    json_reader(json_string);
+    int server_fd, new_socket;
+    struct sockaddr_in address;
+    int opt = 1;
+    int addrlen = sizeof(address);
+    
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+        perror("socket failed");
+        exit(EXIT_FAILURE);
+    }
+       
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT,
+                                                  &opt, sizeof(opt))) {
+        perror("setsockopt");
+        exit(EXIT_FAILURE);
+    }
+    
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons( PORT );
+       
+    if (bind(server_fd, (struct sockaddr *)&address, 
+                                 sizeof(address))<0) {
+        perror("bind failed");
+        exit(EXIT_FAILURE);
+    }
+
+    if (listen(server_fd, 3) < 0) {
+        perror("listen");
+        exit(EXIT_FAILURE);
+    }
+    
+    while (1) {
+        char buffer[1024] = {0};
+        if ((new_socket = accept(server_fd, (struct sockaddr *)&address, 
+                        (socklen_t*)&addrlen))<0) {
+            perror("accept");
+            exit(EXIT_FAILURE);
+        }
+    
+        read(new_socket, buffer, 1024);
+        json_reader(buffer);
+        printf("%s\n%d\n", buffer, server_fd);
+    }
     return 0;
 }
 
 int create_socket() {
-
-    
 	return 0;
 }
 
@@ -231,11 +267,10 @@ int insert_gps_data(int id, double gps_long, double gps_lat, char time[32]) {
 int create_database() {
     if (!con) return sql_err();
 
-    // check if database exists, if not creates it,
 	if (mysql_query(con, "CREATE DATABASE IF NOT EXISTS testdb")) {
 		return sql_err();
 	}
-	// creating tables (if they dont exist)
+
 	if (mysql_query(con, "CREATE TABLE IF NOT EXISTS ESPs(\
 			id INT NOT NULL AUTO_INCREMENT,\
 			uuid CHAR(20) NOT NULL,\
