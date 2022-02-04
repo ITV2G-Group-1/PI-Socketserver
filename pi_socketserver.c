@@ -1,10 +1,3 @@
-/*
-TO ADD
-socket rewrite
-uuid exists check
-comments
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -25,15 +18,15 @@ comments
 #define json_intify(var) (json_object_get_int(var))
 #define json_doublify(var) (json_object_get_double(var))
 
-int create_socket();
-int json_reader(char *json_string);
-int sql_err();
-int connect_to_database();
-int get_uuid_id(char uuid[20]);
-int insert_temp_data(int id, double temp, char time[32]);
-int insert_light_data(int id, int light_intensity, char time[32]);
-int insert_gps_data(int id, double gps_long, double gps_lat, char time[32]);
-int create_database();
+static int create_socket();
+static int json_reader(char *json_string);
+static int sql_err();
+static int connect_to_database();
+static int get_uuid_id(char uuid[20]);
+static int insert_temp_data(int id, double temp, char time[32]);
+static int insert_light_data(int id, int light_intensity, char time[32]);
+static int insert_gps_data(int id, double gps_long, double gps_lat, char time[32]);
+static int create_database();
 
 static const char datetime_format[] = "%Y-%m-%d %X";
 static const char time_format[] = "%X";
@@ -48,10 +41,9 @@ static MYSQL *con;
 static MYSQL_RES *res;
 static MYSQL_ROW row;
 
-int server_fd, new_socket;
-struct sockaddr_in address;
-int opt = 1;
-int addrlen = sizeof(address);
+static int server_fd, new_socket;
+static struct sockaddr_in address;
+static int addrlen = sizeof(address);
 
 int main(int argc, char const *argv[]) {
     connect_to_database();
@@ -69,20 +61,22 @@ int main(int argc, char const *argv[]) {
     }
     
     while (1) {
-        char buffer[1024] = {0};
+        char buffer[2048] = {0};
         if ((new_socket = accept(server_fd, (struct sockaddr *)&address, 
                         (socklen_t*)&addrlen))<0) {
             fprintf(stderr, "accept");
             return 1;
         }
     
-        read(new_socket, buffer, 1024);
+        read(new_socket, buffer, 2048);
         json_reader(buffer);
     }
     return 0;
 }
 
 int create_socket() {
+    int opt = 1;
+
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
         fprintf(stderr, "socket failed");
         return 1;
@@ -134,6 +128,7 @@ int json_reader(char *json_string) {
     parsed_json = json_tokener_parse(json_string);
     if (!parsed_json) {
 		fprintf(stderr, "Message contain invalid json: \n%s\n\n", json_string);
+        return 1;
 	}
 
     json_get_ex(parsed_json, "uuid", &uuid);
@@ -144,6 +139,10 @@ int json_reader(char *json_string) {
     
     strcpy(c_uuid, json_stringify(uuid));
     id = get_uuid_id(c_uuid);
+    if (!id) {
+        fprintf(stderr, "Err occured trying to get id from uuid: %s\n", c_uuid);
+        return 1;
+    }
 
 	json_get_ex(parsed_json, "data", &data);
     if (!data) {
@@ -152,20 +151,20 @@ int json_reader(char *json_string) {
     }
 	
     n_data = json_length(data);
-    fprintf(stdout, "[%s] uuid: %s send %d datapoints\n", curr_time ,c_uuid, n_data);
+    fprintf(stdout, "[%s] id: %d, uuid: %s send %d datapoints\n", curr_time , id, c_uuid, n_data);
     for (i = 0; i < n_data; i++) {
         datapoint = json_get_id(data, i);
 
         json_get_ex(datapoint, "type", &type);
         if (!type) {
             fprintf(stderr, "Error occured while trying to get \"type\": \n%s\n", json_object_stringify(datapoint));
-            break;
+            continue;
         }
 
         json_get_ex(datapoint, "timestamp", &timestamp);
         if (!timestamp) {
             fprintf(stderr, "Error occured while trying to get \"timestamp\": \n%s\n", json_object_stringify(datapoint));
-            break;
+            continue;
         }
 
         t = json_doublify(timestamp);
@@ -212,7 +211,7 @@ int json_reader(char *json_string) {
 
         } else {
             fprintf(stderr, "Error occured while trying to find the \"type\" at datapoint %d from: \n%s\n\n", i, json_object_stringify(datapoint));
-            break;
+            continue;
         }
     }
     return 0;
@@ -242,15 +241,28 @@ int connect_to_database() {
 int get_uuid_id(char uuid[20]) {
 	int id;
 
-	sprintf(query, "SELECT id FROM ESPs WHERE uuid='%s'", uuid);
+	sprintf(query, "SELECT IFNULL(SELECT id FROM ESPs WHERE uuid='%s', NULL)", uuid);
 	mysql_query(con, query);
 
 	res = mysql_store_result(con);
 	
-	if (!res) sql_err();
+	if (!res) {
+        fprintf(stderr, "uuid: %s not found, inserting it into ESPs table\n", uuid);
+        mysql_free_result(res);
+
+        sprintf(query, "INSERT INTO ESPs (uuid) VALUES ('%s')", uuid);
+        mysql_query(con, query);
+
+        mysql_query(con, "SELECT LAST_INSERT_ID()");
+        res = mysql_store_result(con);
+        if (!res) {
+            sql_err();
+            return 0;
+        }
+    }
     
     while((row = mysql_fetch_row(res)) !=0) {
-		id = row[0] ? atof(row[0]) : 0.0f;
+		id = row[0] ? atof(row[0]) : 0;
 
 		mysql_free_result(res);
 		return id;
