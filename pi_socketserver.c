@@ -318,7 +318,7 @@ int create_database() {
 			Light_ESP_id INT NOT NULL,\
 			Light_DateTimeFromESP DATETIME(2) NOT NULL,\
 			Light_TimestampAdded TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\
-			Light_Intensity DECIMAL(11,4) NOT NULL,\
+			Light_Intensity SMALLINT NOT NULL,\
 			PRIMARY KEY (ESP_id, DateTimeFromESP),\
 			CONSTRAINT fk_LightIntensityData_ESPs\
 				FOREIGN KEY (ESP_id)\
