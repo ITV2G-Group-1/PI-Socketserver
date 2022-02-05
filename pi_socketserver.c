@@ -18,7 +18,7 @@
 #define json_doublify(var) (json_object_get_double(var))
 
 #define PORT 17021
-#define BUFFERSIZE 2048
+#define BUFFERSIZE 16384
 
 static int create_socket();
 static int json_reader(char *json_string);
@@ -252,21 +252,32 @@ static int connect_to_database() {
 static int get_uuid_id(char uuid[20]) {
 	int id;
 
+    ensure_db_con(); // Automatically exists if error occurs
+
 	sprintf(query, "SELECT id FROM ESPs WHERE uuid='%s'", uuid);
 	mysql_query(con, query);
 
-	res = mysql_store_result(con);
-	
-	if (!res) {
-        fprintf(stderr, "[SQL ERROR] %s\n", mysql_error(con));
-        return 0;
-    }
-    
+	res = mysql_store_result(con); 
     while((row = mysql_fetch_row(res)) !=0) {
-		id = row[0] ? atof(row[0]) : 0.0f;
+		id = row[0] ? atof(row[0]) : 0;
 
-		mysql_free_result(res);
-		return id;
+		if (id == 0) {
+            fprintf(stderr, "[SQL ERROR] uuid: %s not found, inserting it into ESPs table\n", uuid);
+            mysql_free_result(res);
+
+            sprintf(query, "INSERT INTO ESPs (uuid) VALUES ('%s')", uuid);
+            mysql_query(con, query);
+
+            mysql_query(con, "SELECT LAST_INSERT_ID()");
+            res = mysql_store_result(con);
+
+            while((row = mysql_fetch_row(res)) !=0) {
+		        id = row[0] ? atof(row[0]) : 0;
+            }
+            if (id == 0) sql_err();
+        }
+        mysql_free_result(res);
+        return id;
     }
     return 0;
 }
