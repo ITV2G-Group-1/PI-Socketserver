@@ -33,9 +33,9 @@ static int create_database();
 static const char datetime_format[] = "%Y-%m-%d %X";
 static const char time_format[] = "%X";
 static const char *server = "localhost";
-static const char *user = "main";
-static const char *passwd = "";
-static const char *database = "testdb";
+static const char *user = "groep1user";
+static const char *passwd = "userKanto!1";
+static const char *database = "mydb";
 
 static char query[512];
 static char *buffer;
