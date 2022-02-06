@@ -252,7 +252,7 @@ static int connect_to_database() {
 static int get_uuid_id(char uuid[20]) {
 	int id;
 
-    ensure_db_con(); // Automatically exists if error occurs
+    ensure_db_con(); // Automatically exits if error occurs
 
 	sprintf(query, "SELECT id FROM ESPs WHERE uuid='%s'", uuid);
 	mysql_query(con, query);
@@ -283,7 +283,7 @@ static int get_uuid_id(char uuid[20]) {
 }
 
 static int insert_temp_data(int id, double temp, char time[32]) {
-    ensure_db_con(); // Automatically exists if error occurs
+    ensure_db_con(); // Automatically exits if error occurs
 
     sprintf(query, "INSERT INTO TempData (Temp_ESP_id, Temp_DateTimeFromESP, Temp_Temp) VALUES (%d, '%s', %.8f)", id, time, temp);
     if (mysql_query(con, query)) sql_err();
@@ -291,7 +291,7 @@ static int insert_temp_data(int id, double temp, char time[32]) {
 }
 
 static int insert_light_data(int id, int light_intensity, char time[32]) {
-    ensure_db_con(); // Automatically exists if error occurs
+    ensure_db_con(); // Automatically exits if error occurs
 
     sprintf(query, "INSERT INTO LightIntensityData (Light_ESP_id, Light_DateTimeFromESP, Light_Intensity) VALUES ('%d', '%s', '%d')", id, time, light_intensity);
     if (mysql_query(con, query)) sql_err();
@@ -299,7 +299,7 @@ static int insert_light_data(int id, int light_intensity, char time[32]) {
 }
 
 static int insert_gps_data(int id, double gps_long, double gps_lat, char time[32]) {
-    ensure_db_con(); // Automatically exists if error occurs
+    ensure_db_con(); // Automatically exits if error occurs
 
     sprintf(query, "INSERT INTO GPSData (GPS_ESP_id, GPS_DateTimeFromESP, GPS_long, GPS_lat) VALUES ('%d', '%s', '%.9f', '%.8f')", id, time, gps_long, gps_lat);
     if (mysql_query(con, query)) sql_err();
@@ -307,10 +307,11 @@ static int insert_gps_data(int id, double gps_long, double gps_lat, char time[32
 }
 
 static int create_database() {
-    ensure_db_con(); // Automatically exists if error occurs
-
     sprintf(query, "CREATE DATABASE IF NOT EXISTS %s", database);
 	if (mysql_query(con, query)) sql_err();
+
+    sprintf(query, "USE %s", database);
+    if (mysql_query(con, query)) sql_err();
 
     sprintf(query, "CREATE TABLE IF NOT EXISTS ESPs(\
 			id INT NOT NULL AUTO_INCREMENT,\
@@ -325,7 +326,7 @@ static int create_database() {
 			Temp_DateTimeFromESP DATETIME(2) NOT NULL,\
 			Temp_TimestampAdded TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\
 			Temp_Temp DECIMAL(3,1) NOT NULL,\
-			PRIMARY KEY (Temp_ESP_id, DateTimeFromESP),\
+			PRIMARY KEY (Temp_ESP_id, Temp_DateTimeFromESP),\
 			CONSTRAINT fk_TempData_ESPs\
 				FOREIGN KEY (Temp_ESP_id)\
 				REFERENCES %s.ESPs (id)\
@@ -339,7 +340,7 @@ static int create_database() {
 			Light_DateTimeFromESP DATETIME(2) NOT NULL,\
 			Light_TimestampAdded TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\
 			Light_Intensity SMALLINT NOT NULL,\
-			PRIMARY KEY (Light_ESP_id, DateTimeFromESP),\
+			PRIMARY KEY (Light_ESP_id, Light_DateTimeFromESP),\
 			CONSTRAINT fk_LightIntensityData_ESPs\
 				FOREIGN KEY (Light_ESP_id)\
 				REFERENCES %s.ESPs (id)\
