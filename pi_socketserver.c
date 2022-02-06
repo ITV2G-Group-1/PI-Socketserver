@@ -50,6 +50,7 @@ static int addrlen = sizeof(address);
 
 int main(int argc, char const *argv[]) {
     connect_to_database(); // Automatically exits if error occurs
+    create_database();
     if (create_socket() != 0) return 1;
     
     buffer = malloc(BUFFERSIZE);
