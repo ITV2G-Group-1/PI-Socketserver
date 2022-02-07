@@ -164,7 +164,7 @@ static int json_reader(char *json_string) {
     }
 	
     n_data = json_length(data);
-    fprintf(stdout, "[%s] id: %d, uuid: %s send %d datapoints\n", curr_time , id, c_uuid, n_data);
+    fprintf(stdout, "[%s] id: %d, uuid: %s send %lu datapoints\n", curr_time , id, c_uuid, n_data);
     for (i = 0; i < n_data; i++) {
         datapoint = json_get_id(data, i);
 
