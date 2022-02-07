@@ -24,4 +24,4 @@ json-c install:
 $ sudo apt install libjson-c-dev
 ```
 
-Compile using ```gcc pi_sockerserver.c -std=c99 -lmysqlclient -ljson-c -o <desired output file>```
+Compile using ```gcc pi_socketserver.c -std=c99 -lmysqlclient -ljson-c -o <desired output file>```
