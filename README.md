@@ -1,8 +1,10 @@
 # PI-Socketserver
 
+This program is meant for linux based platforms as some libraries/header dont exist on other platforms
+
 Required libraries:
 
-MariaDB, json-c
+MariaDB, json-c, libmysqlclient-dev
 
 
 MariaDB install:
@@ -14,9 +16,11 @@ MariaDB [(none)]> GRANT ALL ON *.* TO 'admin'@'localhost' IDENTIFIED BY 'passwor
 MariaDB [(none)]> FLUSH PRIVILEGES;
 MariaDB [(none)]> exit
 ```
-Fill 'admin', 'localhost' and 'password' in the following variables: ```char *server, char *user, char *passwd```
 
-Set ```char *database``` to prefered database name ex: "mydb"
+In secret.h fill in 'admin', 'localhost', 'password' of the previous step to ensure a authorised connection to the database
+```char *server "<localhost>", char *user "<admin>", char *passwd "<password>"```
+
+Further change ```char *database "<mydb>"``` to the preferred database name, the program is able to create it itself
 
 
 json-c install:
@@ -24,4 +28,9 @@ json-c install:
 $ sudo apt install libjson-c-dev
 ```
 
-Compile using ```gcc pi_socketserver.c -std=c99 -lmysqlclient -ljson-c -o <desired output file>```
+libmysqlclient-dev install:
+```
+$ sudo apt install libmysqlclient-dev
+```
+
+Compile using ```gcc pi_socketserver.c -lmysqlclient -ljson-c -o <desired output file>```
