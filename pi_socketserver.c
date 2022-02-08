@@ -7,7 +7,9 @@
 #include <time.h>
 #include <json-c/json.h>
 #include <mysql/mysql.h>
+#include "secret.h"
 
+// Define functions for easier and more comprehensible functions
 #define is_hex_char(char) ((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f') || (char >= 'A' && char <= 'F'))
 #define ensure_db_con() (con ? 0 : connect_to_database())
 #define json_get_ex(datapoint, var, result) (json_object_object_get_ex(datapoint, var, result))
@@ -33,10 +35,6 @@ static int create_database();
 
 static const char datetime_format[] = "%Y-%m-%d %X";
 static const char time_format[] = "%X";
-static const char *server = "localhost";
-static const char *user = "groep1user";
-static const char *passwd = "userKanto!1";
-static const char *database = "mydb";
 
 static char query[512];
 static char *buffer;
@@ -51,7 +49,7 @@ static int addrlen = sizeof(address);
 
 int main(int argc, char const *argv[]) {
     connect_to_database(); // Automatically exits if error occurs
-    create_database();
+    create_database(); // Ensures the existence of tables (database check is automaticaly done in connect_to_databasae())
     if (create_socket() != 0) return 1;
     
     buffer = malloc(BUFFERSIZE);
@@ -62,14 +60,16 @@ int main(int argc, char const *argv[]) {
         return 1;
     }
     
+    // Get data from connected client, parse it and clear buffer
     while (1) {
-        memset(buffer, 0, BUFFERSIZE);
+        memset(buffer, 0, BUFFERSIZE); 
         if ((new_socket = accept(server_fd, (struct sockaddr *)&address, 
                         (socklen_t*)&addrlen))<0) {
             fprintf(stderr, "[SOCK ERROR] Failure occured while accepting a clients connection");
             return 1;
         }
-    
+
+        // Set buffer to recieved data and parse it
         read(new_socket, buffer, BUFFERSIZE);
         json_reader(buffer);
         memset(buffer, 0, BUFFERSIZE);
@@ -77,6 +77,7 @@ int main(int argc, char const *argv[]) {
     return 0;
 }
 
+// Creates a socket so clients can connect
 static int create_socket() {
     int opt = 1;
 
@@ -107,6 +108,7 @@ static int create_socket() {
     return 0;
 }
 
+//Parses json into the database
 static int json_reader(char *json_string) {
     struct json_object *parsed_json;
 	struct json_object *uuid;
@@ -138,53 +140,55 @@ static int json_reader(char *json_string) {
 	lt = *localtime(&t);
 	strftime(curr_time, sizeof(curr_time), time_format, &lt);
 
-    parsed_json = json_tokener_parse(json_string);
+    parsed_json = json_tokener_parse(json_string); // Get json string
     if (!parsed_json) {
 		fprintf(stderr, "[JSON ERROR] Message contained invalid json: \n%s\n\n", json_string);
         return 1;
 	}
 
-    json_get_ex(parsed_json, "uuid", &uuid);
+    json_get_ex(parsed_json, "uuid", &uuid); // Get uuid
     if (!uuid) {
         fprintf(stderr, "[JSON ERROR] Couldn't acquire \"uuid\" from: \n%s\n\n", json_string);
         return 1;
     }
 
-    strcpy(c_uuid, json_stringify(uuid));
+    strcpy(c_uuid, json_stringify(uuid)); // Get id from uuid, creates database entry if it doesnt exist
     id = get_uuid_id(c_uuid);
     if (!id) {
         fprintf(stderr, "[SQL ERROR] Couldn't acquire id from uuid: %s\n", c_uuid);
         return 1;
     }
 
-	json_get_ex(parsed_json, "data", &data);
+	json_get_ex(parsed_json, "data", &data); // Get data
     if (!data) {
         fprintf(stderr, "[JSON ERROR] Couldn't acquire \"data\": \n%s\n\n", json_string);
         return 1;
     }
 	
+    // Loop through datapoints
     n_data = json_length(data);
     fprintf(stdout, "[%s] id: %d, uuid: %s send %lu datapoints\n", curr_time , id, c_uuid, n_data);
     for (i = 0; i < n_data; i++) {
         datapoint = json_get_id(data, i);
 
-        json_get_ex(datapoint, "type", &type);
+        json_get_ex(datapoint, "type", &type); // Get type
         if (!type) {
             fprintf(stderr, "[JSON ERROR] Couldn't acquire \"type\" from: \n%s\n", json_object_stringify(datapoint));
             continue;
         }
 
-        json_get_ex(datapoint, "timestamp", &timestamp);
+        json_get_ex(datapoint, "timestamp", &timestamp); // Get timestamp
         if (!timestamp) {
             fprintf(stderr, "[JSON ERROR] Couldn't acquire \"timestamp\" from: \n%s\n", json_object_stringify(datapoint));
             continue;
         }
 
+        // Set timestamp to datetime
         t = json_doublify(timestamp);
 		lt = *localtime(&t);
 		strftime(ESP_time, sizeof(ESP_time), datetime_format, &lt);
 
-        strcpy(c_type, json_stringify(type));
+        strcpy(c_type, json_stringify(type)); // Check for temperature values
         if (strcmp(c_type, "temperature") == 0) {
             json_get_ex(datapoint, "value", &value);
             d_temp = json_doublify(value);
@@ -195,7 +199,7 @@ static int json_reader(char *json_string) {
 
             insert_temp_data(id, d_temp, ESP_time);
 
-        } else if (strcmp(c_type, "light") == 0) {
+        } else if (strcmp(c_type, "light") == 0) { // Check for light values
             json_get_ex(datapoint, "value", &value);
             i_light = json_intify(value);
             if (!i_light) {
@@ -205,7 +209,7 @@ static int json_reader(char *json_string) {
             
             insert_light_data(id, i_light, ESP_time);
 
-        } else if (strcmp(c_type, "gps") == 0) {
+        } else if (strcmp(c_type, "gps") == 0) { // Check for gps values
             json_get_ex(datapoint, "lng", &gps_long);
             d_long = json_doublify(gps_long);
             if (!d_long) {
@@ -222,7 +226,7 @@ static int json_reader(char *json_string) {
 
             insert_gps_data(id, d_long, d_lat, ESP_time);
 
-        } else {
+        } else { // Data contains unknown type and skips current datapoint
             fprintf(stderr, "[JSON ERROR] Couldn't acquire \"type\" from: \n%s\n\n", json_object_stringify(datapoint));
             continue;
         }
@@ -230,12 +234,15 @@ static int json_reader(char *json_string) {
     return 0;
 }
 
+// Prints an SQL error, closes connection and exits the program
+// Will only be called of automatic repair is (most likely) not possible
 static int sql_err() {
 	fprintf(stderr, "[SQL ERROR] %s\n", mysql_error(con));
 	if (con) mysql_close(con);
 	exit(1);
 }
 
+// Connects to server to the database
 static int connect_to_database() {
     con = mysql_init(NULL);
     if (!con) sql_err();
@@ -244,53 +251,53 @@ static int connect_to_database() {
                 NULL, 0, NULL, 0)) sql_err();
 
     sprintf(query, "USE %s", database);
-    if (mysql_query(con, query)) {
+    if (mysql_query(con, query)) { // Check if database exists and creates it if it doesnt
         fprintf(stderr, "[SQL ERROR] %s\nCreating database '%s'\n", mysql_error(con), database);
         create_database(); // Automatically exits if error occurs
     }
 	return 0;
 }
 
+// Gets id from given uuid
 static int get_uuid_id(char uuid[20]) {
 	int id;
 
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 20; i++) { // Check if uuid is hexadecimal (prevents SQL injection)
         if (!is_hex_char(uuid[i])) return 0;
     }
 
     ensure_db_con(); // Automatically exits if error occurs
 
 	sprintf(query, "SELECT(SELECT id FROM ESPs WHERE uuid='%s')", uuid);
-	mysql_query(con, query);
+	mysql_query(con, query); // Get id number if it exists or returns 0
 
 	res = mysql_store_result(con); 
     while((row = mysql_fetch_row(res)) !=0) {
-		id = row[0] ? atof(row[0]) : 0;
+		id = row[0] ? atof(row[0]) : 0; // Assign id to id number or 0 if no entry
     }
     mysql_free_result(res);
 
-	if (id != 0) return id;
-    else {
-        fprintf(stderr, "[SQL ERROR] uuid: %s not found, inserting it into ESPs table\n", uuid);
+	if (id != 0) return id; // Check for if id has been found and returns it
+    
+    fprintf(stderr, "[SQL ERROR] uuid: %s not found, inserting it into ESPs table\n", uuid);
 
-        sprintf(query, "INSERT INTO ESPs (uuid) VALUES ('%s')", uuid);
-        mysql_query(con, query);
+    sprintf(query, "INSERT INTO ESPs (uuid) VALUES ('%s')", uuid);
+    mysql_query(con, query); // Adds new uuid to the database
 
-        mysql_query(con, "SELECT LAST_INSERT_ID()");
-        res = mysql_store_result(con);
+    mysql_query(con, "SELECT LAST_INSERT_ID()"); // Get last inserted id
+    res = mysql_store_result(con);
 
-        while((row = mysql_fetch_row(res)) !=0) {
-		    id = row[0] ? atof(row[0]) : 0;
-        }
-
-        if (id == 0) sql_err();
-
-        mysql_free_result(res);
-        return id;
+    while((row = mysql_fetch_row(res)) !=0) {
+        id = row[0] ? atof(row[0]) : 0; // Try to get id again
     }
-    return 0;
+
+    if (id == 0) sql_err(); // If id still doesnt exist, print error and exit
+
+    mysql_free_result(res);
+    return id; // Returns id
 }
 
+// Inserts temperature data into the database
 static int insert_temp_data(int id, double temp, char time[32]) {
     ensure_db_con(); // Automatically exits if error occurs
 
@@ -299,6 +306,7 @@ static int insert_temp_data(int id, double temp, char time[32]) {
     return 0;
 }
 
+// Inserts light intensity data into the database
 static int insert_light_data(int id, int light_intensity, char time[32]) {
     ensure_db_con(); // Automatically exits if error occurs
 
@@ -307,6 +315,7 @@ static int insert_light_data(int id, int light_intensity, char time[32]) {
     return 0;
 }
 
+// Inserts gps data into the database
 static int insert_gps_data(int id, double gps_long, double gps_lat, char time[32]) {
     ensure_db_con(); // Automatically exits if error occurs
 
@@ -315,6 +324,7 @@ static int insert_gps_data(int id, double gps_long, double gps_lat, char time[32
     return 0;
 }
 
+// Creates database and tables if they do not yet exist
 static int create_database() {
     sprintf(query, "CREATE DATABASE IF NOT EXISTS %s", database);
 	if (mysql_query(con, query)) sql_err();
